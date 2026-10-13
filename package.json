@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-gigaam",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Offline Russian voice input for bb, powered by GigaAM v3. Installs and runs the model on your own machine; CPU only, no API keys.",
   "license": "MIT",
   "author": "AiXenix (https://aixenix.com)",
@@ -22,11 +22,7 @@
     "russian",
     "voice-input",
     "dictation",
-    "offline",
-    "meetings",
-    "zoom",
-    "notetaker",
-    "transcription"
+    "offline"
   ],
   "type": "module",
   "engines": {

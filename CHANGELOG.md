@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Meetings moved to its own repository, [AiXenix/bb-plugin-meetings](https://github.com/AiXenix/bb-plugin-meetings), together with its `meeting-bb-aixenix` skill.
+- This plugin ships the `gigaam-voice` skill again.
+
 ## 0.1.1
 
 - The agent skill is now **`meeting-bb-aixenix`**. It replaces `gigaam-voice` and covers both GigaAM voice input and the Meetings notetaker.
