@@ -1,0 +1,61 @@
+{
+  "name": "bb-plugin-gigaam",
+  "version": "0.1.0",
+  "description": "Offline Russian voice input for bb, powered by GigaAM v3. Installs and runs the model on your own machine; CPU only, no API keys.",
+  "license": "MIT",
+  "author": "AiXenix (https://aixenix.com)",
+  "homepage": "https://github.com/AiXenix/bb-plugin-gigaam#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AiXenix/bb-plugin-gigaam.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AiXenix/bb-plugin-gigaam/issues"
+  },
+  "keywords": [
+    "bb",
+    "bb-plugin",
+    "gigaam",
+    "speech-to-text",
+    "speech-recognition",
+    "asr",
+    "russian",
+    "voice-input",
+    "dictation",
+    "offline"
+  ],
+  "type": "module",
+  "engines": {
+    "bb": ">=0.46",
+    "bbPluginSdk": ">=0.6.37"
+  },
+  "bb": {
+    "name": "GigaAM Voice Input",
+    "description": "Offline Russian voice input powered by GigaAM v3. Installs and runs the model on your own machine; CPU only, no API keys.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "host": "./host.ts"
+  },
+  "scripts": {
+    "embed": "node scripts/embed-python.mjs",
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "build": "bb plugin build"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.37",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "better-sqlite3": "^12.11.1",
+    "cron-parser": "^5.10.2",
+    "hono": "^4.13.13",
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.4"
+  }
+}
