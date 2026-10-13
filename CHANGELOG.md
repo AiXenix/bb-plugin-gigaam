@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- The agent skill is now **`meeting-bb-aixenix`**. It replaces `gigaam-voice` and covers both GigaAM voice input and the Meetings notetaker.
+- The repository now also hosts the **Meetings** plugin in `plugins/meetings`, released with `meetings/vX.Y.Z` tags. Install it with `--subdirectory plugins/meetings --tag-prefix meetings/`.
+
 ## 0.1.0
 
 - First release: the GigaAM v3 voice input service for bb.

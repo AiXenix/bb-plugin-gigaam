@@ -10,6 +10,29 @@ Press the mic in any bb chat, speak Russian, get punctuated text. The plugin ins
 
 ![GigaAM v3 selected as the voice input service in bb](docs/screenshots/ai-services.png)
 
+## Meeting BB (AiXenix): this repository has two plugins
+
+| Plugin | Where | What it does |
+|---|---|---|
+| **GigaAM Voice Input** (`gigaam`) | repository root | Russian speech-to-text for bb's microphone, and the local ASR server that Meetings uses |
+| **Meetings** (`meetings`) | [`plugins/meetings`](plugins/meetings) | A Fireflies-style Zoom notetaker: a bot joins a meeting from a link, records it, and transcribes it live with GigaAM. The transcript is split by speaker, and everything is on a **Встречи** page in bb |
+
+Both ship one agent skill, **`meeting-bb-aixenix`** ([`skills/meeting-bb-aixenix/SKILL.md`](skills/meeting-bb-aixenix/SKILL.md)). It covers voice input and the full meetings workflow: join, stop, transcripts, summaries, speakers, search, and the JSON API for agents outside bb.
+
+```sh
+bb plugin install git:https://github.com/AiXenix/bb-plugin-gigaam@^0.1.1        # GigaAM + the skill
+bb plugin install git:https://github.com/AiXenix/bb-plugin-gigaam@^0.1.0 --subdirectory plugins/meetings --tag-prefix meetings/
+bb meetings doctor && bb meetings setup                                          # Chrome, Xvfb, PulseAudio, models
+```
+
+Then tell an agent «Запиши встречу https://zoom.us/j/…». Meetings docs: [README](plugins/meetings/README.md) · [руководство на русском](plugins/meetings/docs/guide.ru.md).
+
+![Meetings: a finished meeting with an agent-written summary, audio player and speakers](plugins/meetings/docs/screenshots/meetings-summary.jpg)
+
+| Live transcript, split by speaker | The bot inside a real Zoom meeting |
+|---|---|
+| ![Live transcript with speaker names](plugins/meetings/docs/screenshots/meetings-live-transcript.jpg) | ![Live view of the bot in Zoom](plugins/meetings/docs/screenshots/meetings-zoom-live.jpg) |
+
 ## Features
 
 - **Zero setup.** On first load the plugin downloads [uv](https://github.com/astral-sh/uv), a private Python 3.12, CPU-only PyTorch, GigaAM, and the model into its own data directory. It needs no root, Docker, system Python, or ffmpeg.
@@ -43,7 +66,7 @@ bb plugin install gigaam
 Or straight from GitHub:
 
 ```sh
-bb plugin install git:https://github.com/AiXenix/bb-plugin-gigaam@^0.1.0
+bb plugin install git:https://github.com/AiXenix/bb-plugin-gigaam@^0.1.1
 ```
 
 Then make it the voice input service. Use **Settings → AI services → Voice input → GigaAM v3**, or run:
@@ -134,6 +157,10 @@ bb plugin config gigaam set serverUrl http://gpu-box:8765
 ```
 
 Any server with an OpenAI-compatible `POST /v1/audio/transcriptions` works the same way. The server has no authentication, so keep it on a private network.
+
+## Agent skill
+
+The plugin ships **`meeting-bb-aixenix`**. bb agents use it to check and fix voice input (`bb gigaam status | logs | restart | reinstall`, settings, limits). With the Meetings plugin installed, the same skill drives the whole notetaker: recording Zoom calls, reading and summarizing transcripts, renaming speakers, explaining join errors, and the `bb meetings api` JSON entry point for agents outside bb.
 
 ## Troubleshooting
 

@@ -14,3 +14,7 @@ You can also send recordings to your own OpenAI-compatible transcription server,
 ## Requirements
 
 Linux (x86-64 or arm64) or macOS on Apple silicon, about 2 GB of disk, and 1.5 GB of free RAM. GigaAM v3 recognizes Russian only.
+
+## Works with Meetings
+
+The same repository has the **Meetings** plugin (`plugins/meetings`), a Zoom notetaker that records meetings and transcribes them with this GigaAM server, split by speaker. Both plugins share one agent skill, `meeting-bb-aixenix`.
