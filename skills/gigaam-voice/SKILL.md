@@ -25,6 +25,14 @@ bb voice transcribe <audio-file>   # end-to-end test through bb
 `restart` and `reinstall` return at once. Poll `bb gigaam status` until it
 reports `ready` or `failed`.
 
+The managed decoder reads complete uploads through a private seekable temporary
+file and removes it after decoding. This supports MP4/M4A with metadata after
+audio data. Decode failures log only container, MIME type, byte count and bounded
+ffmpeg diagnostics; recordings are not retained. An incomplete recording cannot
+be repaired by retrying the same bytes: save it through BB's Download recording
+action for diagnosis, then record again. Never report a damaged file as an empty
+successful transcript.
+
 ## Settings
 
 `bb plugin config gigaam set <key> <value>`:

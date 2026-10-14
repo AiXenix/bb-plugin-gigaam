@@ -79,7 +79,7 @@ flowchart LR
 
 1. bb hands each recording to the plugin's voice service (`bb.experimental_aiServices`).
 2. The service forwards it to the plugin's host entry, which runs on the bb server's machine.
-3. The host entry owns a small FastAPI server ([`python/gigaam_server.py`](python/gigaam_server.py)). The server decodes the audio with ffmpeg, cuts long recordings at pauses, and runs GigaAM.
+3. The host entry owns a small FastAPI server ([`python/gigaam_server.py`](python/gigaam_server.py)). The server decodes each complete upload with ffmpeg through a private seekable temporary file, cuts long recordings at pauses, and runs GigaAM. The temporary file is removed after decoding, including error and timeout paths. This supports MP4/M4A with metadata after the audio data, which cannot be reliably read from a stdin stream.
 4. The transcript goes back to bb and appears in the message box.
 
 The host entry keeps the model loaded between recordings, so only the first start after boot waits for model loading (about 10 s).
@@ -149,6 +149,7 @@ The plugin ships the `gigaam-voice` skill ([`skills/gigaam-voice/SKILL.md`](skil
 - **The install failed.** Run `bb gigaam logs` to find the failing step. Fix the cause (usually network or disk space), then run `bb gigaam reinstall`. A failed install also retries on its own, with backoff up to one hour.
 - **English words come out in Cyrillic.** GigaAM v3 recognizes Russian only, and the vocabulary hint from bb is ignored.
 - **The plugin uses too much CPU.** Lower `threads`, or switch to `v3_e2e_ctc`.
+- **The recording cannot be decoded.** Current versions accept complete MP4/M4A, WebM, WAV and other ffmpeg-supported audio. If a recording was interrupted or its container is incomplete, save it with BB's **Download recording** action and record again. Retrying the same damaged file does not reconstruct missing audio metadata. `bb gigaam logs` reports the container, MIME type, byte count and bounded decoder diagnostics without storing the recording.
 
 ## Uninstall
 
@@ -163,6 +164,7 @@ bb deletes the plugin, but the downloaded environment and models stay in the dat
 ```sh
 npm install
 npm test                    # unit tests with the bb plugin SDK harness
+python3 -m unittest discover -s python -p 'test_*.py'  # decoder regressions; ffmpeg needed for format tests
 GIGAAM_E2E=1 npm test       # real install + transcription (downloads ~1.5 GB)
 npm run typecheck
 npm run build               # bb plugin build

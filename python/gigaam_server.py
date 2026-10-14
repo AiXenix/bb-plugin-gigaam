@@ -20,6 +20,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -30,6 +31,80 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 FFMPEG_TIMEOUT_S = 120
 
 log = logging.getLogger("gigaam-server")
+
+
+class AudioDecodeError(Exception):
+    """A public, credential-free error safe to return to the recording UI."""
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def audio_container(data: bytes) -> str:
+    """Classify only a container header; never include uploaded bytes in logs."""
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        return "mp4"
+    if data.startswith(b"\x1aE\xdf\xa3"):
+        return "webm"
+    if data.startswith(b"RIFF") and data[8:12] == b"WAVE":
+        return "wav"
+    if data.startswith(b"OggS"):
+        return "ogg"
+    if data.startswith(b"ID3") or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "mp3"
+    return "unknown"
+
+
+def decode_pcm(data: bytes, ffmpeg: str, mime_type: str = "") -> bytes:
+    """Decode complete uploads using a private seekable input, including MP4."""
+    known_mimes = {
+        "audio/mp4", "video/mp4", "audio/x-m4a", "audio/aac", "audio/webm",
+        "video/webm", "audio/ogg", "audio/wav", "audio/x-wav", "audio/mpeg",
+        "application/octet-stream",
+    }
+    reported_mime = mime_type.split(";", 1)[0].strip().lower()
+    safe_mime = reported_mime if reported_mime in known_mimes else "unknown"
+    container = audio_container(data)
+    invalid_message = "Не удалось прочитать аудиозапись. Запишите сообщение ещё раз."
+    if not data:
+        raise AudioDecodeError("Аудиозапись пустая. Запишите сообщение ещё раз.")
+
+    # pipe:0 cannot seek back to mdat when a valid MP4 has its moov at the end.
+    # TemporaryDirectory is 0700; the input file is explicitly 0600. Both are
+    # removed on success, decoder failure, timeout, or another exception.
+    with tempfile.TemporaryDirectory(prefix="gigaam-audio-") as directory:
+        path = os.path.join(directory, "input.audio")
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as uploaded:
+            uploaded.write(data)
+        cmd = [
+            ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-i", path,
+            "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le", "-ar", str(SAMPLE_RATE),
+            "pipe:1",
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            log.warning("audio decode failed: container=%s mime=%s bytes=%d reason=timeout", container, safe_mime, len(data))
+            raise AudioDecodeError("Обработка аудиозаписи заняла слишком много времени. Запишите сообщение ещё раз.", 504) from None
+        except OSError:
+            log.error("audio decode failed: container=%s mime=%s bytes=%d reason=decoder-unavailable", container, safe_mime, len(data))
+            raise AudioDecodeError("Обработка аудио временно недоступна. Попробуйте ещё раз.", 503) from None
+        pcm = proc.stdout[: len(proc.stdout) - len(proc.stdout) % 2]
+        if proc.returncode != 0 or not pcm:
+            # Keep bounded decoder diagnostics on the server only. Do not expose
+            # temporary paths or raw ffmpeg errors to the recording UI.
+            diagnostic = proc.stderr.decode(errors="replace").replace(path, "[uploaded audio]")
+            diagnostic = " ".join(diagnostic.split())[-600:]
+            log.warning(
+                "audio decode failed: container=%s mime=%s bytes=%d reason=%s ffmpeg=%s",
+                container, safe_mime, len(data), "decoder-error" if proc.returncode else "empty-pcm",
+                diagnostic or "no diagnostic",
+            )
+            raise AudioDecodeError(invalid_message)
+        return pcm
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,21 +167,11 @@ def build_app(args: argparse.Namespace):
     lock = threading.Lock()
     app = FastAPI(title="GigaAM v3", docs_url=None, redoc_url=None)
 
-    def decode_audio(data: bytes) -> "torch.Tensor":
-        cmd = [
-            ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
-            "-i", "pipe:0",
-            "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le", "-ar", str(SAMPLE_RATE),
-            "pipe:1",
-        ]
-        proc = subprocess.run(cmd, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
-        if proc.returncode != 0:
-            detail = proc.stderr.decode(errors="replace").strip()[-300:]
-            raise HTTPException(400, f"Could not decode audio: {detail or 'ffmpeg failed'}")
-        pcm = bytearray(proc.stdout)
-        pcm = pcm[: len(pcm) - len(pcm) % 2]
-        if not pcm:
-            return torch.zeros(0)
+    def decode_audio(data: bytes, mime_type: str = "") -> "torch.Tensor":
+        try:
+            pcm = bytearray(decode_pcm(data, ffmpeg, mime_type))
+        except AudioDecodeError as error:
+            raise HTTPException(error.status_code, str(error)) from None
         return torch.frombuffer(pcm, dtype=torch.int16).float() / 32768.0
 
     def split_points(wav: "torch.Tensor") -> list:
@@ -157,9 +222,9 @@ def build_app(args: argparse.Namespace):
         if len(data) > MAX_UPLOAD_BYTES:
             raise HTTPException(413, "Audio exceeds 25 MB")
         if not data:
-            raise HTTPException(400, "Audio file is empty")
+            raise HTTPException(400, "Аудиозапись пустая. Запишите сообщение ещё раз.")
         started = time.monotonic()
-        wav = decode_audio(data)
+        wav = decode_audio(data, file.content_type or "")
         text = transcribe_wav(wav)
         log.info(
             "transcribed %.1fs of audio in %.2fs (%d chars)",

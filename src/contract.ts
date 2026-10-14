@@ -91,8 +91,20 @@ export async function requestTranscription(
     signal,
   });
   if (!response.ok) {
-    const detail = (await response.text()).slice(0, 300);
-    throw new Error(`GigaAM server returned ${response.status}: ${detail}`);
+    const raw = (await response.text()).slice(0, 2_000);
+    let detail = "";
+    try {
+      const body: unknown = JSON.parse(raw);
+      if (typeof body === "object" && body !== null && "detail" in body && typeof body.detail === "string") {
+        detail = body.detail.trim().slice(0, 500);
+      }
+    } catch {}
+    if (response.status === 400 && (!detail || /Could not decode audio|Audio file is empty/i.test(detail))) {
+      throw new Error("Не удалось прочитать аудиозапись. Запишите сообщение заново; на телефоне дождитесь остановки записи, прежде чем сворачивать страницу.");
+    }
+    if (response.status === 413) throw new Error("Аудиозапись слишком большая. Запишите более короткое сообщение.");
+    if (response.status === 504) throw new Error("Обработка аудиозаписи заняла слишком много времени. Попробуйте более короткую запись.");
+    throw new Error(detail || `GigaAM не смог обработать запись (HTTP ${response.status}). Попробуйте ещё раз.`);
   }
   const body: unknown = await response.json();
   const text = (body as { text?: unknown } | null)?.text;

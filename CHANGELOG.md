@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 — 2026-10-14
+
+- Decode uploaded MP4/M4A through a private seekable temporary file, so containers with metadata after their audio data can be read correctly.
+- Reject failed or empty decoder output with a readable recording error instead of silently returning an empty transcript.
+- Keep decoder diagnostics in the server log and show readable recording guidance in BB.
+
 ## 0.1.2
 
 - Meetings moved to its own repository, [AiXenix/bb-plugin-meetings](https://github.com/AiXenix/bb-plugin-meetings), together with its `meeting-bb-aixenix` skill.
